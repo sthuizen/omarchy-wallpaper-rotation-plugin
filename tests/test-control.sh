@@ -46,6 +46,7 @@ control="$PROJECT_DIR/WallpaperRotation.sh"
 jq -e '.enabled == true and .intervalMinutes == 60 and .mode == "sequential"' \
   "$HOME/.config/omarchy/wallpaper-rotation/config.json" >/dev/null
 grep -F 'OnUnitActiveSec=60m' "$HOME/.config/systemd/user/omarchy-wallpaper-rotation.timer" >/dev/null
+grep -F 'StartLimitIntervalSec=0' "$HOME/.config/systemd/user/omarchy-wallpaper-rotation.timer" >/dev/null
 systemd-analyze --user verify \
   "$HOME/.config/systemd/user/omarchy-wallpaper-rotation.service" \
   "$HOME/.config/systemd/user/omarchy-wallpaper-rotation.timer"

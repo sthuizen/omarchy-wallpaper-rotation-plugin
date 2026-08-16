@@ -88,6 +88,7 @@ EOF
   content=$(cat <<EOF
 [Unit]
 Description=Rotate the Omarchy wallpaper every $interval minutes
+StartLimitIntervalSec=0
 
 [Timer]
 OnActiveSec=${interval}m
@@ -113,7 +114,8 @@ sync_timer() {
   write_units
   systemctl_user daemon-reload
   if [[ $(config_value '.enabled') == true ]]; then
-    systemctl_user enable --now "$TIMER_NAME" >/dev/null
+    systemctl_user enable "$TIMER_NAME" >/dev/null
+    systemctl_user reset-failed "$TIMER_NAME" >/dev/null 2>&1 || true
     systemctl_user restart "$TIMER_NAME"
   else
     systemctl_user disable --now "$TIMER_NAME" >/dev/null 2>&1 || true
