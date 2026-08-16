@@ -288,6 +288,7 @@ status_json() {
     now_us=$(( $(date +%s) * 1000000 ))
     next_minutes=$(( (next_us - now_us + 59999999) / 60000000 ))
     (( next_minutes < 0 )) && next_minutes=0
+    (( next_minutes > interval )) && next_minutes=$interval
   fi
   current=$(current_background)
   theme=$(current_theme)
