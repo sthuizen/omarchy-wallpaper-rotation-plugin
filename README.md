@@ -20,6 +20,10 @@ Shuffle and manual selections use the supported `omarchy theme bg set` command.
 - Fresh theme and current-wallpaper state on every scheduled run
 - No network access, elevated privileges, or packaged-file changes
 
+Omarchy 4.0.4 compatibility was checked against its installed plugin validator,
+theme background commands, and user systemd unit syntax. Wallpaper previews
+cover the image formats handled by `omarchy theme bg next` in 4.0.4.
+
 ## Install
 
 ```bash
