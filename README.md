@@ -27,7 +27,7 @@ cover the image formats handled by `omarchy theme bg next` in 4.0.4.
 ## Install
 
 ```bash
-omarchy plugin add https://github.com/thenailedone/omarchy-wallpaper-rotation-plugin.git --enable --yes
+omarchy plugin add https://github.com/sthuizen/omarchy-wallpaper-rotation-plugin.git --enable --yes
 omarchy bar put thenailedone.wallpaper-rotation --section right
 ```
 

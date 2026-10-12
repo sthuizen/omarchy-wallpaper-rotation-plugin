@@ -3,7 +3,7 @@
   "id": "thenailedone.wallpaper-rotation",
   "name": "Wallpaper Rotation",
   "version": "1.0.1",
-  "author": "thenailedone",
+  "author": "sthuizen",
   "license": "MIT",
   "description": "Preview and rotate the active Omarchy theme's wallpapers using the supported theme background commands.",
   "kinds": [
