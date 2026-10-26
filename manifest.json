@@ -2,7 +2,7 @@
   "schemaVersion": 1,
   "id": "thenailedone.wallpaper-rotation",
   "name": "Wallpaper Rotation",
-  "version": "1.0.1",
+  "version": "1.1.0",
   "author": "sthuizen",
   "license": "MIT",
   "description": "Preview and rotate the active Omarchy theme's wallpapers using the supported theme background commands.",
@@ -19,34 +19,6 @@
     "description": "Preview, select, and automatically rotate theme wallpapers.",
     "category": "System",
     "allowMultiple": false,
-    "defaultSection": "right",
-    "defaults": {
-      "enabled": true,
-      "intervalMinutes": 60,
-      "mode": "sequential"
-    },
-    "schema": [
-      {
-        "key": "enabled",
-        "type": "boolean",
-        "label": "Automatic rotation",
-        "defaultValue": true
-      },
-      {
-        "key": "intervalMinutes",
-        "type": "integer",
-        "label": "Interval (minutes)",
-        "min": 5,
-        "max": 1440,
-        "defaultValue": 60
-      },
-      {
-        "key": "mode",
-        "type": "enum",
-        "label": "Order",
-        "options": ["sequential", "shuffle"],
-        "defaultValue": "sequential"
-      }
-    ]
+    "defaultSection": "right"
   }
 }
