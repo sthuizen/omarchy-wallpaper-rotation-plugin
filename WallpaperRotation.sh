@@ -3,19 +3,22 @@
 set -euo pipefail
 
 PLUGIN_ID="thenailedone.wallpaper-rotation"
-CONFIG_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/omarchy/wallpaper-rotation"
+OMARCHY_HOME="${WALLPAPER_ROTATION_HOME:-$HOME}"
+CONFIG_DIR="${XDG_CONFIG_HOME:-$OMARCHY_HOME/.config}/omarchy/wallpaper-rotation"
+SHELL_CONFIG="${XDG_CONFIG_HOME:-$OMARCHY_HOME/.config}/omarchy/shell.json"
 CONFIG_FILE="$CONFIG_DIR/config.json"
-STATE_DIR="${XDG_STATE_HOME:-$HOME/.local/state}/omarchy/wallpaper-rotation"
+STATE_DIR="${XDG_STATE_HOME:-$OMARCHY_HOME/.local/state}/omarchy/wallpaper-rotation"
 SHUFFLE_FILE="$STATE_DIR/shuffle.json"
 LOCK_FILE="$STATE_DIR/rotation.lock"
-SYSTEMD_DIR="${XDG_CONFIG_HOME:-$HOME/.config}/systemd/user"
+SYSTEMD_DIR="${XDG_CONFIG_HOME:-$OMARCHY_HOME/.config}/systemd/user"
 SERVICE_NAME="omarchy-wallpaper-rotation.service"
 TIMER_NAME="omarchy-wallpaper-rotation.timer"
 SERVICE_FILE="$SYSTEMD_DIR/$SERVICE_NAME"
 TIMER_FILE="$SYSTEMD_DIR/$TIMER_NAME"
 SCRIPT_PATH=$(realpath "$0")
-OMARCHY_BIN="${WALLPAPER_ROTATION_OMARCHY:-/usr/share/omarchy/bin/omarchy}"
+OMARCHY_BIN="${WALLPAPER_ROTATION_OMARCHY:-omarchy}"
 SYSTEMCTL_BIN="${WALLPAPER_ROTATION_SYSTEMCTL:-systemctl}"
+UNITS_CHANGED=0
 
 die() {
   printf 'wallpaper-rotation: %s\n' "$*" >&2
@@ -37,7 +40,7 @@ default_config() {
 
 normalize_config() {
   jq -c '
-    . as $source |
+    (if type == "object" then . else {} end) as $source |
     {
       enabled: (if ($source.enabled | type) == "boolean" then $source.enabled else true end),
       intervalMinutes: (if (($source.intervalMinutes | type) == "number") and ($source.intervalMinutes | floor == $source.intervalMinutes) and ($source.intervalMinutes >= 5) and ($source.intervalMinutes <= 1440) then $source.intervalMinutes else 60 end),
@@ -67,22 +70,39 @@ config_value() {
   jq -r "$1" "$CONFIG_FILE"
 }
 
+systemd_quote() {
+  # Both command arguments and unit conditions expand systemd specifiers.
+  local value="$1"
+  value=${value//\\/\\\\}
+  value=${value//\"/\\\"}
+  value=${value//%/%%}
+  printf '"%s"' "$value"
+}
+
 write_units() {
-  local interval content
+  local interval content script_argument script_condition
   interval=$(config_value '.intervalMinutes')
+  script_argument=$(systemd_quote "$SCRIPT_PATH")
+  # Conditions take a literal path, not the ExecStart command-line syntax.
+  script_condition=${SCRIPT_PATH//%/%%}
+  UNITS_CHANGED=0
 
   content=$(cat <<EOF
 [Unit]
 Description=Rotate the active Omarchy theme wallpaper
 After=graphical-session.target
+ConditionPathExists=$script_condition
 
 [Service]
 Type=oneshot
-ExecStart="$SCRIPT_PATH" rotate
+ExecStart=$script_argument scheduled
+# Rearm from completion; no previous service timestamp can shorten a manual reset.
+ExecStopPost=/usr/bin/systemctl --user --no-block try-restart $TIMER_NAME
 EOF
 )
   if [[ ! -f $SERVICE_FILE ]] || [[ $(<"$SERVICE_FILE") != "$content" ]]; then
     printf '%s\n' "$content" | atomic_write "$SERVICE_FILE"
+    UNITS_CHANGED=1
   fi
 
   content=$(cat <<EOF
@@ -92,9 +112,7 @@ StartLimitIntervalSec=0
 
 [Timer]
 OnActiveSec=${interval}m
-OnUnitActiveSec=${interval}m
 AccuracySec=1min
-Persistent=true
 Unit=$SERVICE_NAME
 
 [Install]
@@ -103,6 +121,7 @@ EOF
 )
   if [[ ! -f $TIMER_FILE ]] || [[ $(<"$TIMER_FILE") != "$content" ]]; then
     printf '%s\n' "$content" | atomic_write "$TIMER_FILE"
+    UNITS_CHANGED=1
   fi
 }
 
@@ -112,22 +131,23 @@ systemctl_user() {
 
 sync_timer() {
   write_units
-  systemctl_user daemon-reload
+  if (( UNITS_CHANGED )); then systemctl_user daemon-reload; fi
   if [[ $(config_value '.enabled') == true ]]; then
-    systemctl_user enable "$TIMER_NAME" >/dev/null
     systemctl_user reset-failed "$TIMER_NAME" >/dev/null 2>&1 || true
-    systemctl_user restart "$TIMER_NAME"
+    systemctl_user enable --now "$TIMER_NAME" >/dev/null
+    # An unchanged init (shell restart or plugin reload) preserves the due time.
+    if (( UNITS_CHANGED )); then systemctl_user restart "$TIMER_NAME"; fi
   else
     systemctl_user disable --now "$TIMER_NAME" >/dev/null 2>&1 || true
   fi
 }
 
 current_theme() {
-  cat "$HOME/.local/state/omarchy/current/theme.name" 2>/dev/null || true
+  cat "$OMARCHY_HOME/.local/state/omarchy/current/theme.name" 2>/dev/null || true
 }
 
 current_background() {
-  readlink -f "$HOME/.local/state/omarchy/current/background" 2>/dev/null || true
+  readlink -f "$OMARCHY_HOME/.local/state/omarchy/current/background" 2>/dev/null || true
 }
 
 catalog_paths() {
@@ -135,8 +155,8 @@ catalog_paths() {
   local -A seen=()
   local paths=()
   theme=$(current_theme)
-  current_dir="$HOME/.local/state/omarchy/current/theme/backgrounds"
-  user_dir="$HOME/.config/omarchy/backgrounds/$theme"
+  current_dir="$OMARCHY_HOME/.local/state/omarchy/current/theme/backgrounds"
+  user_dir="$OMARCHY_HOME/.config/omarchy/backgrounds/$theme"
 
   while IFS= read -r -d '' path; do
     resolved=$(realpath -m "$path")
@@ -180,7 +200,7 @@ save_shuffle_queue() {
 shuffle_rotate() {
   local catalog signature theme current target saved_signature saved_theme
   local all=() remaining=() candidates=()
-  local i j temporary encoded
+  local i j temporary
 
   catalog=$(catalog_json)
   mapfile -t all < <(jq -r '.[] | .path | @base64' <<<"$catalog")
@@ -191,7 +211,11 @@ shuffle_rotate() {
   theme=$(current_theme)
   current=$(current_background)
 
-  if [[ -f $SHUFFLE_FILE ]] && jq -e . "$SHUFFLE_FILE" >/dev/null 2>&1; then
+  if [[ -f $SHUFFLE_FILE ]] && jq -e '
+    type == "object" and (.theme | type) == "string"
+    and (.signature | type) == "string" and (.remaining | type) == "array"
+    and all(.remaining[]; type == "string")
+  ' "$SHUFFLE_FILE" >/dev/null 2>&1; then
     saved_signature=$(jq -r '.signature // ""' "$SHUFFLE_FILE")
     saved_theme=$(jq -r '.theme // ""' "$SHUFFLE_FILE")
     if [[ $saved_signature == "$signature" && $saved_theme == "$theme" ]]; then
@@ -199,6 +223,12 @@ shuffle_rotate() {
       for i in "${!remaining[@]}"; do remaining[$i]=$(base64 -d <<<"${remaining[$i]}"); done
     fi
   fi
+
+  # Another wallpaper picker may have selected the next queued image.
+  candidates=()
+  for i in "${remaining[@]}"; do [[ $i == "$current" ]] || candidates+=("$i"); done
+  remaining=("${candidates[@]}")
+  candidates=()
 
   if (( ${#remaining[@]} == 0 )); then
     for i in "${all[@]}"; do [[ $i == "$current" ]] || candidates+=("$i"); done
@@ -234,9 +264,36 @@ rotate_once() {
   rotate_core
 }
 
+plugin_enabled() {
+  # Follow Omarchy's own enablement rules, including shelved widgets in plugins[].
+  [[ -f $SHELL_CONFIG ]] || return 1
+  jq -e --arg id "$PLUGIN_ID" '
+    ((.disabledPlugins // [] | index($id)) == null) and
+    ([ (.plugins // [])[], (.bar.layout.left // [])[],
+       (.bar.layout.center // [])[], (.bar.layout.right // [])[] ] |
+      any(.[]; (if type == "string" then . else .id? end) == $id))
+  ' "$SHELL_CONFIG" >/dev/null 2>&1
+}
+
+scheduled_rotate() {
+  plugin_enabled || return 0
+  rotate_once
+}
+
+uninstall_timer() {
+  systemctl_user disable --now "$TIMER_NAME"
+  systemctl_user stop "$SERVICE_NAME"
+  rm -f "$SERVICE_FILE" "$TIMER_FILE"
+  systemctl_user daemon-reload
+  systemctl_user reset-failed "$SERVICE_NAME" "$TIMER_NAME" >/dev/null 2>&1 || true
+}
+
 set_wallpaper() {
   local target="$1" catalog
   [[ -n $target ]] || die 'a wallpaper path is required'
+  ensure_config
+  exec 9>"$LOCK_FILE"
+  flock 9
   catalog=$(catalog_json)
   jq -e --arg target "$(realpath -m "$target")" 'any(.[]; .path == $target)' <<<"$catalog" >/dev/null \
     || die 'wallpaper is not part of the active theme'
@@ -248,29 +305,31 @@ set_wallpaper() {
 configure() {
   local key="${1:-}" value="${2:-}" temporary
   ensure_config
-  temporary=$(mktemp "$CONFIG_FILE.tmp.XXXXXX")
   case "$key" in
     enabled)
       [[ $value == true || $value == false ]] || die 'enabled must be true or false'
-      jq --argjson value "$value" '.enabled = $value' "$CONFIG_FILE" >"$temporary"
       ;;
     intervalMinutes)
-      [[ $value =~ ^[0-9]+$ ]] && (( value >= 5 && value <= 1440 )) \
+      [[ $value =~ ^[0-9]{1,4}$ ]] && (( 10#$value >= 5 && 10#$value <= 1440 )) \
         || die 'intervalMinutes must be an integer from 5 to 1440'
-      jq --argjson value "$value" '.intervalMinutes = $value' "$CONFIG_FILE" >"$temporary"
+      value=$((10#$value))
       ;;
     mode)
       [[ $value == sequential || $value == shuffle ]] || die 'mode must be sequential or shuffle'
-      jq --arg value "$value" '.mode = $value' "$CONFIG_FILE" >"$temporary"
-      reset_shuffle
       ;;
     *)
-      rm -f "$temporary"
       die 'unknown configuration key'
       ;;
   esac
+  temporary=$(mktemp "$CONFIG_FILE.tmp.XXXXXX")
+  if [[ $key == mode ]]; then
+    jq --arg value "$value" '.mode = $value' "$CONFIG_FILE" >"$temporary"
+  else
+    jq --arg key "$key" --argjson value "$value" '.[$key] = $value' "$CONFIG_FILE" >"$temporary"
+  fi
   chmod 0644 "$temporary"
   mv -f "$temporary" "$CONFIG_FILE"
+  [[ $key != mode ]] || reset_shuffle
   sync_timer
 }
 
@@ -305,6 +364,8 @@ initialize() {
 
 case "${1:-}" in
   init) initialize ;;
+  scheduled) scheduled_rotate ;;
+  uninstall) uninstall_timer ;;
   configure) configure "${2:-}" "${3:-}" ;;
   rotate) rotate_once ;;
   next)
@@ -315,5 +376,5 @@ case "${1:-}" in
   set) set_wallpaper "${2:-}" ;;
   catalog) catalog_json ;;
   status) status_json ;;
-  *) die 'usage: WallpaperRotation.sh {init|configure KEY VALUE|rotate|next|set PATH|catalog|status}' ;;
+  *) die 'usage: WallpaperRotation.sh {init|configure KEY VALUE|scheduled|rotate|next|set PATH|catalog|status|uninstall}' ;;
 esac

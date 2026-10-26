@@ -2,6 +2,7 @@ import QtQuick
 import QtQuick.Controls
 import QtQuick.Layouts
 import qs.Commons
+import qs.Commons as Commons
 import qs.Ui
 
 Panel {
@@ -13,9 +14,9 @@ Panel {
   property var hostWidget: null
   property var service: null
   readonly property var barIdentity: hostWidget || root
-  readonly property color foreground: bar ? bar.foreground : Color.foreground
+  readonly property color foreground: bar ? bar.foreground : Commons.Color.foreground
   readonly property color dim: Qt.darker(foreground, 1.45)
-  readonly property color urgent: bar ? bar.urgent : Color.urgent
+  readonly property color urgent: bar ? bar.urgent : Commons.Color.urgent
   readonly property string fontFamily: bar ? bar.fontFamily : Style.font.family
   readonly property real cellSize: Style.space(92)
   readonly property real cellSpacing: Style.space(8)
@@ -164,7 +165,7 @@ Panel {
                 Rectangle {
                   anchors.fill: parent
                   color: "transparent"
-                  border.color: cell.isCurrent ? Color.accent : root.dim
+                  border.color: cell.isCurrent ? Commons.Color.accent : root.dim
                   border.width: cell.isCurrent ? 3 : 1
                 }
 
@@ -209,7 +210,7 @@ Panel {
             description: "Uses a persistent user timer and Omarchy's supported background commands."
             checked: root.service ? root.service.enabled : false
             foreground: root.foreground
-            accent: Color.accent
+            accent: Commons.Color.accent
             fontFamily: root.fontFamily
             enabled: root.service && !root.service.busy
             onClicked: root.service.setEnabled(!root.service.enabled)
@@ -250,7 +251,7 @@ Panel {
             focusable: true
             enabled: root.service && !root.service.busy
             foreground: root.foreground
-            accent: Color.accent
+            accent: Commons.Color.accent
             fontFamily: root.fontFamily
             onClicked: root.service.applyNext()
           }
