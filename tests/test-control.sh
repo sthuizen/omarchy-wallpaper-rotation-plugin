@@ -62,6 +62,10 @@ if grep -azq '^restart$' "$TEST_USER_HOME/systemctl.calls"; then
   echo 'unchanged init restarted the timer' >&2
   exit 1
 fi
+if grep -azq '^enable$' "$TEST_USER_HOME/systemctl.calls"; then
+  echo 'unchanged init redundantly enabled the timer (and reloaded the manager)' >&2
+  exit 1
+fi
 
 catalog=$("$control" catalog)
 [[ $(jq 'length' <<<"$catalog") == 3 ]]

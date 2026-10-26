@@ -133,10 +133,18 @@ sync_timer() {
   write_units
   if (( UNITS_CHANGED )); then systemctl_user daemon-reload; fi
   if [[ $(config_value '.enabled') == true ]]; then
-    systemctl_user reset-failed "$TIMER_NAME" >/dev/null 2>&1 || true
-    systemctl_user enable --now "$TIMER_NAME" >/dev/null
-    # An unchanged init (shell restart or plugin reload) preserves the due time.
-    if (( UNITS_CHANGED )); then systemctl_user restart "$TIMER_NAME"; fi
+    # Even a redundant enable --now reloads the manager and can postpone an
+    # OnActiveSec deadline. Leave an already enabled, active timer untouched.
+    if ! systemctl_user is-enabled --quiet "$TIMER_NAME"; then
+      systemctl_user enable "$TIMER_NAME" >/dev/null
+    fi
+    if (( UNITS_CHANGED )); then
+      systemctl_user reset-failed "$TIMER_NAME" >/dev/null 2>&1 || true
+      systemctl_user restart "$TIMER_NAME"
+    elif ! systemctl_user is-active --quiet "$TIMER_NAME"; then
+      systemctl_user reset-failed "$TIMER_NAME" >/dev/null 2>&1 || true
+      systemctl_user start "$TIMER_NAME"
+    fi
   else
     systemctl_user disable --now "$TIMER_NAME" >/dev/null 2>&1 || true
   fi

@@ -3,6 +3,8 @@
 ## 1.1.0 — Timer lifecycle and recovery
 
 - Preserve the rotation deadline when the shell restarts or plugin code reloads.
+- Avoid redundant `systemctl enable --now` calls: bare-metal testing on systemd
+  262 showed that its implicit manager reload postpones an active deadline.
 - Rearm a single-baseline timer after each service run so a manual wallpaper
   selection really starts a full new interval, including after earlier rotations.
 - Skip scheduled rotations while the plugin is disabled in Omarchy, including

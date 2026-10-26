@@ -25,6 +25,14 @@ Checked against Omarchy 4.0.6's plugin validator, enablement rules, and theme
 background commands, plus the [current plugin documentation](https://omarchy.org/manual/shell-plugins/).
 Wallpaper previews cover the image formats supported by the installed background command.
 
+Bare-metal validation on 26 October 2026 used a Framework Laptop 13 (AMD Ryzen
+7040 Series), Omarchy 4.0.6, and systemd 262.1. The real popup displayed all 20
+Quattro Sunset wallpapers. Native IPC, disable/re-enable, shuffle, manual selection,
+reload deadline preservation, and repeated real timer firings passed. A temporary
+10-second timer override accelerated scheduling checks and was removed afterward;
+the final setting was hourly sequential rotation. Suspend and reboot were not
+exercised during this test.
+
 ## Install
 
 ```bash
