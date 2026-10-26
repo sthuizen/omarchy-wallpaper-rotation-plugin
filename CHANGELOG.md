@@ -1,6 +1,6 @@
 # Changelog
 
-## 1.1.0 — Timer lifecycle and recovery
+## 1.1.0 — 2026-10-26 — Timer lifecycle and recovery
 
 - Preserve the rotation deadline when the shell restarts or plugin code reloads.
 - Avoid redundant `systemctl enable --now` calls: bare-metal testing on systemd
@@ -22,6 +22,9 @@
   for the updated behavior. Checked against Omarchy 4.0.6.
 - Qualify the Omarchy colour singleton in the panel to avoid Qt Quick Controls'
   conflicting `Color` type and undefined colour bindings.
+- Add the real popup screenshot and bare-metal validation report. Native timer,
+  enablement, shuffle, manual-reset, and reload checks passed on a Framework
+  Laptop 13; suspend and reboot remain untested.
 
 ## 1.0.1 — Omarchy 4.0.4 compatibility
 

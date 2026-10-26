@@ -2,6 +2,11 @@
 
 A native Omarchy Quattro bar plugin for previewing, selecting, and automatically rotating the active theme's wallpapers.
 
+![Wallpaper Rotation 1.1.0 displaying all 20 Quattro Sunset wallpapers on a Framework laptop](preview.png)
+
+Actual screenshot from the tested bare-metal installation. The gallery follows
+the active theme; Quattro Sunset is the example shown here.
+
 The scheduler uses a user-level systemd timer independently of the shell's QML lifetime. Sequential changes delegate directly to Omarchy's supported command:
 
 ```bash
@@ -32,6 +37,9 @@ reload deadline preservation, and repeated real timer firings passed. A temporar
 10-second timer override accelerated scheduling checks and was removed afterward;
 the final setting was hourly sequential rotation. Suspend and reboot were not
 exercised during this test.
+
+See the [bare-metal validation report](docs/bare-metal-validation.md) for the
+test scope, outcomes, and timing fix discovered on the laptop.
 
 ## Install
 
@@ -79,7 +87,7 @@ the interval once.
 ## Commands
 
 ```bash
-omarchy-shell -q thenailedone.wallpaper-rotation status
+omarchy-shell thenailedone.wallpaper-rotation status
 omarchy-shell -q thenailedone.wallpaper-rotation next
 omarchy-shell -q thenailedone.wallpaper-rotation enable
 omarchy-shell -q thenailedone.wallpaper-rotation disable
